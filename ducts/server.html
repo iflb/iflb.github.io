@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Server &mdash; DUCTS  documentation</title>
+      <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/doctools.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Client" href="client.html" />
+    <link rel="prev" title="DUCTS Documentation" href="index.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="index.html" class="icon icon-home"> DUCTS
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Server</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#installation">Installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#creating-event-handlers">Creating Event Handlers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#event-handler-hooks">Event Handler Hooks</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#common-redis-usage">Common Redis Usage</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#routing-web-apis">Routing Web APIs</a></li>
+</ul>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="client.html">Client</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="client.html#installation-in-python">Installation (in Python)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="client.html#quick-start-example">Quick start example</a></li>
+<li class="toctree-l2"><a class="reference internal" href="client.html#communication-with-server">Communication with Server</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="client.html#send">Send</a></li>
+<li class="toctree-l3"><a class="reference internal" href="client.html#call">Call</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">DUCTS</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home"></a> &raquo;</li>
+      <li>Server</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/server.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="server">
+<h1>Server<a class="headerlink" href="#server" title="Permalink to this headline"></a></h1>
+<section id="installation">
+<h2>Installation<a class="headerlink" href="#installation" title="Permalink to this headline"></a></h2>
+<ol class="arabic">
+<li><p>Install package via pip:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">pip</span> <span class="n">install</span> <span class="n">ducts</span>
+</pre></div>
+</div>
+</li>
+<li><p>In working directory, make <code class="docutils literal notranslate"><span class="pre">htdocs</span></code> and <code class="docutils literal notranslate"><span class="pre">handler</span></code> directories:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">mkdir</span> <span class="n">htdocs</span>
+<span class="n">mkdir</span> <span class="n">handler</span>    <span class="c1"># Optional</span>
+</pre></div>
+</div>
+</li>
+<li><p>Generate <a class="reference external" href="https://github.com/iflb/ifconf">ifconf</a> config file and write it to <code class="docutils literal notranslate"><span class="pre">config_server.ini</span></code>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">python</span> <span class="o">-</span><span class="n">m</span> <span class="n">ifconf</span> <span class="n">ducts</span><span class="o">.</span><span class="n">server</span><span class="o">.</span><span class="n">config</span> <span class="o">&gt;</span> <span class="n">config_server</span><span class="o">.</span><span class="n">ini</span>
+<span class="n">python</span> <span class="o">-</span><span class="n">m</span> <span class="n">ifconf</span> <span class="n">ducts</span><span class="o">.</span><span class="n">redis</span><span class="o">.</span><span class="n">config</span> <span class="o">&gt;&gt;</span> <span class="n">config_server</span><span class="o">.</span><span class="n">ini</span>
+</pre></div>
+</div>
+</li>
+<li><p>(Optional) Comment-in and change config values as necessary. For instance:</p>
+<div class="highlight-ini notranslate"><div class="highlight"><pre><span></span><span class="k">[ducts.server_config]</span><span class="w"></span>
+
+<span class="na">...</span><span class="w"></span>
+
+<span class="c1"># inet port to bind (&lt;class &#39;int&#39;&gt;)</span><span class="w"></span>
+<span class="na">httpd_port</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">8888    # commented-in and changed</span><span class="w"></span>
+
+<span class="c1"># local path for static root (&lt;class &#39;pathlib.Path&#39;&gt;)</span><span class="w"></span>
+<span class="c1"># local_path_static = htdocs</span><span class="w"></span>
+
+<span class="na">...</span><span class="w"></span>
+</pre></div>
+</div>
+</li>
+<li><p>Start Redis server.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">redis</span><span class="o">-</span><span class="n">server</span> <span class="o">--</span><span class="n">port</span> <span class="o">&lt;</span><span class="n">port</span><span class="o">&gt;</span> <span class="o">&amp;</span>
+</pre></div>
+</div>
+</li>
+<li><p>Start DUCTS server.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">python</span> <span class="o">-</span><span class="n">m</span> <span class="n">ducts</span> <span class="n">server</span> <span class="n">start</span>
+<span class="c1"># OR explicitly specify config file to load with -c option</span>
+<span class="n">python</span> <span class="o">-</span><span class="n">m</span> <span class="n">ducts</span> <span class="n">server</span> <span class="n">start</span> <span class="o">-</span><span class="n">c</span> <span class="n">config_server</span><span class="o">.</span><span class="n">ini</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>By default, DUCTS tries to find and load <code class="docutils literal notranslate"><span class="pre">config_&lt;module</span> <span class="pre">name&gt;.ini</span></code> for the config file.
+In the above run command, argument that follows “ducts” is the module file (i.e., “server”), thereby trying <code class="docutils literal notranslate"><span class="pre">config_server.ini</span></code> when no option is specified.</p>
+</div>
+<p>If server is started successfully, the logs will be shown like below:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>&gt; python -m ducts server start
+2022-03-06 17:14:15,050 [root] [WARNING] Set output logging as stderr output.
+2022-03-06 17:14:15,050 [root] [INFO] Enabled logging. Printing INFO logs.
+2022-03-06 17:14:15,050 [root] [INFO] Completed configuration for file [&#39;config_server.ini&#39;]
+2022-03-06 17:14:15,067 [ducts.redis] [NOTICE] CONNECTED|URL=(&#39;localhost&#39;, 6379)
+2022-03-06 17:14:15,077 [ducts.event.manager] [INFO] PLUGIN_DIR=/path/to/ducts/working/directory/handler
+2022-03-06 17:14:15,085 [ducts.server.httpd] [NOTICE] START|SOCKET=(&#39;0.0.0.0&#39;, 8888)
+&gt;
+</pre></div>
+</div>
+<p>As of current version, the process will run in background <strong>AND</strong> logs are printed as standard output by default.
+To have output log disabled or redirected to a file, run:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># Disable output log</span>
+<span class="n">python</span> <span class="o">-</span><span class="n">m</span> <span class="n">ducts</span> <span class="n">server</span> <span class="n">start</span> <span class="o">&amp;&gt;</span> <span class="o">/</span><span class="n">dev</span><span class="o">/</span><span class="n">null</span>
+<span class="c1"># Redirect to a file</span>
+<span class="n">python</span> <span class="o">-</span><span class="n">m</span> <span class="n">ducts</span> <span class="n">server</span> <span class="n">start</span> <span class="o">&amp;&gt;</span> <span class="n">log</span><span class="o">.</span><span class="n">txt</span>
+</pre></div>
+</div>
+</li>
+<li><p>To stop DUCTS server, run:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">python</span> <span class="o">-</span><span class="n">m</span> <span class="n">ducts</span> <span class="n">server</span> <span class="n">stop</span>
+<span class="c1"># OR if config file was specified when server was started</span>
+<span class="n">python</span> <span class="o">-</span><span class="n">m</span> <span class="n">ducts</span> <span class="n">server</span> <span class="n">stop</span> <span class="o">-</span><span class="n">c</span> <span class="n">config_server</span><span class="o">.</span><span class="n">ini</span>
+</pre></div>
+</div>
+</li>
+</ol>
+</section>
+<section id="creating-event-handlers">
+<h2>Creating Event Handlers<a class="headerlink" href="#creating-event-handlers" title="Permalink to this headline"></a></h2>
+<p>Event handlers are endpoints of request-response communications with clients.</p>
+<ol class="arabic" start="0">
+<li><p>If <code class="docutils literal notranslate"><span class="pre">handler</span></code> directory does not exist in the project root, create it.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">mkdir</span> <span class="n">handler</span>
+</pre></div>
+</div>
+</li>
+<li><p>Create a <code class="docutils literal notranslate"><span class="pre">.py</span></code> file for an event handler in the following format,</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">touch</span> <span class="n">evt_</span><span class="o">&lt;</span><span class="n">event</span> <span class="n">ID</span><span class="o">&gt;</span><span class="n">_</span><span class="o">&lt;</span><span class="n">event_name_joined_with_underscores</span><span class="o">&gt;.</span><span class="n">py</span>
+</pre></div>
+</div>
+<p>where event ID is <strong>a number (&gt;= 1000)</strong>.</p>
+</li>
+<li><p>Each event hander file must have the following format (at minimum):</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">ducts.spi</span> <span class="kn">import</span> <span class="n">EventHandler</span>
+
+<span class="k">class</span> <span class="nc">Handler</span><span class="p">(</span><span class="n">EventHandler</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">setup</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">handler_spec</span><span class="p">,</span> <span class="n">manager</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Called once this event handler file is loaded upon starting the server.</span>
+<span class="sd">            Must return handler_spec.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">handler_spec</span>
+
+    <span class="k">async</span> <span class="k">def</span> <span class="nf">handle</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Called upon client&#39;s request to this event.</span>
+<span class="sd">            Return value (any JSON-parsable type) is a response to the client.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># do something ...</span>
+        <span class="k">return</span> <span class="s1">&#39;Some response&#39;</span>
+</pre></div>
+</div>
+</li>
+<li><p>Restart DUCTS server and access <code class="docutils literal notranslate"><span class="pre">http(s)://&lt;your_domain&gt;/ducts/wsd?uuid=test</span></code> from your browser to check if the defined event is successfully loaded.</p>
+<div class="highlight-javascript notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+    <span class="s2">&quot;websocket_host&quot;</span><span class="o">:</span> <span class="s2">&quot;localhost:8888&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;websocket_url&quot;</span><span class="o">:</span> <span class="s2">&quot;ws://localhost:8888/ducts/ws/v1/3bf0e158b223fe43fb8c2681f918d9e38c8a7393.MTY0NjU2MTE0NjE1NC0w&quot;</span><span class="p">,</span>
+    <span class="p">...,</span>
+    <span class="s2">&quot;EVENT&quot;</span><span class="o">:</span> <span class="p">{</span>
+        <span class="s2">&quot;ALIVE_MONITORING&quot;</span><span class="o">:</span> <span class="mf">0</span><span class="p">,</span>
+        <span class="s2">&quot;LOOP_RESPONSE_START&quot;</span><span class="o">:</span> <span class="mf">1</span><span class="p">,</span>
+        <span class="p">...,</span>
+        <span class="s2">&quot;MY_SAMPLE_TEST&quot;</span><span class="o">:</span> <span class="mf">1000</span>    <span class="c1">// added event handler</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</li>
+</ol>
+</section>
+<section id="event-handler-hooks">
+<h2>Event Handler Hooks<a class="headerlink" href="#event-handler-hooks" title="Permalink to this headline"></a></h2>
+<p>Event handler has several useful lifecycle hooks.</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="ducts.spi.EventHandler">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">ducts.spi.</span></span><span class="sig-name descname"><span class="pre">EventHandler</span></span><a class="reference internal" href="_modules/ducts/spi.html#EventHandler"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#ducts.spi.EventHandler" title="Permalink to this definition"></a></dt>
+<dd><dl class="py method">
+<dt class="sig sig-object py" id="ducts.spi.EventHandler.handle">
+<em class="property"><span class="pre">abstract</span><span class="w"> </span><span class="pre">async</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">handle</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">event</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ducts/spi.html#EventHandler.handle"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#ducts.spi.EventHandler.handle" title="Permalink to this definition"></a></dt>
+<dd><p>called when messaged is passed by the client.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ducts.spi.EventHandler.handle_closed">
+<em class="property"><span class="pre">async</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">handle_closed</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">event_session</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ducts/spi.html#EventHandler.handle_closed"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#ducts.spi.EventHandler.handle_closed" title="Permalink to this definition"></a></dt>
+<dd><p>called when the session is closed.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ducts.spi.EventHandler.handle_connected">
+<em class="property"><span class="pre">async</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">handle_connected</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">event_session</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ducts/spi.html#EventHandler.handle_connected"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#ducts.spi.EventHandler.handle_connected" title="Permalink to this definition"></a></dt>
+<dd><p>called when the new session is started.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ducts.spi.EventHandler.handle_wait_reconnect">
+<em class="property"><span class="pre">async</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">handle_wait_reconnect</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">event_session</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ducts/spi.html#EventHandler.handle_wait_reconnect"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#ducts.spi.EventHandler.handle_wait_reconnect" title="Permalink to this definition"></a></dt>
+<dd><p>called when the connection failure is detected.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ducts.spi.EventHandler.run">
+<em class="property"><span class="pre">async</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">run</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">manager</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ducts/spi.html#EventHandler.run"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#ducts.spi.EventHandler.run" title="Permalink to this definition"></a></dt>
+<dd><p>called onece when server is started.
+coroutine returned by this method is passed to ensure_future method</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ducts.spi.EventHandler.setup">
+<em class="property"><span class="pre">abstract</span><span class="w"> </span><span class="pre">async</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">setup</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">handler_spec</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">manager</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ducts/spi.html#EventHandler.setup"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#ducts.spi.EventHandler.setup" title="Permalink to this definition"></a></dt>
+<dd><p>called onece when server starts setup process.
+coroutine returned by this method is awaited by the manager</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="common-redis-usage">
+<h2>Common Redis Usage<a class="headerlink" href="#common-redis-usage" title="Permalink to this headline"></a></h2>
+<p>DUCTS provides a wrapper utility class named <code class="docutils literal notranslate"><span class="pre">RedisClient</span></code> for communication with Redis server, built upon <a class="reference external" href="https://aioredis.readthedocs.io/en/latest/">aioredis</a>.
+Once server is started, <code class="docutils literal notranslate"><span class="pre">RedisClient</span></code> is automatically instanciated and can be accessed from <code class="docutils literal notranslate"><span class="pre">manager.redis</span></code> or <code class="docutils literal notranslate"><span class="pre">event.session.redis</span></code>.
+The two objects share the same instance and can be used equivalently.</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="ducts.redis.RedisClient">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">ducts.redis.</span></span><span class="sig-name descname"><span class="pre">RedisClient</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">loop</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ducts/redis.html#RedisClient"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#ducts.redis.RedisClient" title="Permalink to this definition"></a></dt>
+<dd><dl class="py method">
+<dt class="sig sig-object py" id="ducts.redis.RedisClient.close">
+<em class="property"><span class="pre">async</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">close</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/ducts/redis.html#RedisClient.close"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#ducts.redis.RedisClient.close" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ducts.redis.RedisClient.connect">
+<em class="property"><span class="pre">async</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">connect</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/ducts/redis.html#RedisClient.connect"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#ducts.redis.RedisClient.connect" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ducts.redis.RedisClient.connect_for_blocking">
+<em class="property"><span class="pre">async</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">connect_for_blocking</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">minsize</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">maxsize</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ducts/redis.html#RedisClient.connect_for_blocking"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#ducts.redis.RedisClient.connect_for_blocking" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ducts.redis.RedisClient.evalsha">
+<em class="property"><span class="pre">async</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">evalsha</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">script</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">numkeys</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">params</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ducts/redis.html#RedisClient.evalsha"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#ducts.redis.RedisClient.evalsha" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ducts.redis.RedisClient.execute">
+<em class="property"><span class="pre">async</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">execute</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cmd</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ducts/redis.html#RedisClient.execute"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#ducts.redis.RedisClient.execute" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ducts.redis.RedisClient.execute_str">
+<em class="property"><span class="pre">async</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">execute_str</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cmd</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ducts/redis.html#RedisClient.execute_str"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#ducts.redis.RedisClient.execute_str" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ducts.redis.RedisClient.execute_threadsafe">
+<span class="sig-name descname"><span class="pre">execute_threadsafe</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">func</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ducts/redis.html#RedisClient.execute_threadsafe"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#ducts.redis.RedisClient.execute_threadsafe" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ducts.redis.RedisClient.hget_all_str">
+<em class="property"><span class="pre">async</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">hget_all_str</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">key</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ducts/redis.html#RedisClient.hget_all_str"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#ducts.redis.RedisClient.hget_all_str" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ducts.redis.RedisClient.psub_and_xrange_str">
+<em class="property"><span class="pre">async</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">psub_and_xrange_str</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">subkey</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">streamkey</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">last_count</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ducts/redis.html#RedisClient.psub_and_xrange_str"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#ducts.redis.RedisClient.psub_and_xrange_str" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ducts.redis.RedisClient.psub_and_xrange_str_for_each_id">
+<em class="property"><span class="pre">async</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">psub_and_xrange_str_for_each_id</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">subkey</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">streamkey</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ducts/redis.html#RedisClient.psub_and_xrange_str_for_each_id"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#ducts.redis.RedisClient.psub_and_xrange_str_for_each_id" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ducts.redis.RedisClient.psubscribe">
+<em class="property"><span class="pre">async</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">psubscribe</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">key</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ducts/redis.html#RedisClient.psubscribe"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#ducts.redis.RedisClient.psubscribe" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ducts.redis.RedisClient.punsubscribe">
+<em class="property"><span class="pre">async</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">punsubscribe</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">key_or_channel</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ducts/redis.html#RedisClient.punsubscribe"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#ducts.redis.RedisClient.punsubscribe" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ducts.redis.RedisClient.scan_for">
+<em class="property"><span class="pre">async</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">scan_for</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">pattern</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">count</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">10</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ducts/redis.html#RedisClient.scan_for"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#ducts.redis.RedisClient.scan_for" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ducts.redis.RedisClient.subscribe">
+<em class="property"><span class="pre">async</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">subscribe</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">key</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ducts/redis.html#RedisClient.subscribe"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#ducts.redis.RedisClient.subscribe" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ducts.redis.RedisClient.unsubscribe">
+<em class="property"><span class="pre">async</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">unsubscribe</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">key_or_channel</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ducts/redis.html#RedisClient.unsubscribe"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#ducts.redis.RedisClient.unsubscribe" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ducts.redis.RedisClient.xadd">
+<em class="property"><span class="pre">async</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">xadd</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">streamkey</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ducts/redis.html#RedisClient.xadd"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#ducts.redis.RedisClient.xadd" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ducts.redis.RedisClient.xadd_and_publish">
+<em class="property"><span class="pre">async</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">xadd_and_publish</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">pubkey</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">streamkey</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ducts/redis.html#RedisClient.xadd_and_publish"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#ducts.redis.RedisClient.xadd_and_publish" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ducts.redis.RedisClient.xget_str">
+<em class="property"><span class="pre">async</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">xget_str</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">streamkey</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">stream_id</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ducts/redis.html#RedisClient.xget_str"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#ducts.redis.RedisClient.xget_str" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ducts.redis.RedisClient.xget_str_with_id">
+<em class="property"><span class="pre">async</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">xget_str_with_id</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">streamkey</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">stream_id</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ducts/redis.html#RedisClient.xget_str_with_id"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#ducts.redis.RedisClient.xget_str_with_id" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ducts.redis.RedisClient.xlast_str">
+<em class="property"><span class="pre">async</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">xlast_str</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">streamkey</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ducts/redis.html#RedisClient.xlast_str"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#ducts.redis.RedisClient.xlast_str" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ducts.redis.RedisClient.xlast_str_with_id">
+<em class="property"><span class="pre">async</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">xlast_str_with_id</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">streamkey</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ducts/redis.html#RedisClient.xlast_str_with_id"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#ducts.redis.RedisClient.xlast_str_with_id" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ducts.redis.RedisClient.xrevrange_str">
+<em class="property"><span class="pre">async</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">xrevrange_str</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">streamkey</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">start</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'+'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">stop</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'-'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">count</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">10</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ducts/redis.html#RedisClient.xrevrange_str"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#ducts.redis.RedisClient.xrevrange_str" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="routing-web-apis">
+<h2>Routing Web APIs<a class="headerlink" href="#routing-web-apis" title="Permalink to this headline"></a></h2>
+<p>In addition to WebSocket communication, DUCTS also provides feature for creating Web API endpoints for normal HTTP(S) requests and responses which are linked to event handler files.</p>
+<p>For example, on server side:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">aiohttp</span> <span class="kn">import</span> <span class="n">web</span>
+<span class="kn">from</span> <span class="nn">ducts.spi</span> <span class="kn">import</span> <span class="n">EventHandler</span><span class="p">,</span> <span class="n">webapi</span>
+
+<span class="k">class</span> <span class="nc">Handler</span><span class="p">(</span><span class="n">EventHandler</span><span class="p">):</span>
+    <span class="nd">@webapi</span><span class="o">.</span><span class="n">add_route</span><span class="p">(</span><span class="n">path</span><span class="o">=</span><span class="s2">&quot;/echo/</span><span class="si">{msg}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s1">&#39;GET&#39;</span><span class="p">)</span>
+    <span class="k">async</span> <span class="k">def</span> <span class="nf">echo</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">request</span><span class="p">):</span>
+        <span class="n">msg</span> <span class="o">=</span> <span class="n">request</span><span class="o">.</span><span class="n">match_info</span><span class="p">[</span><span class="s1">&#39;msg&#39;</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">web</span><span class="o">.</span><span class="n">Response</span><span class="p">(</span><span class="n">text</span><span class="o">=</span><span class="n">msg</span><span class="p">)</span>   <span class="c1"># just echoes back client&#39;s message</span>
+</pre></div>
+</div>
+<p>Since this feature is an extension of <a class="reference external" href="https://docs.aiohttp.org/en/stable/web_reference.html#aiohttp.web.UrlDispatcher.add_route">aiohttp’s <code class="docutils literal notranslate"><span class="pre">add_route()</span></code> method</a>, it can be used in the same way but in the decorator style.
+Every decorated function is easily served as a Web API endpoint, which is routed based on the event handler the function is declared in.
+Say the above code is written in an event handler file named <code class="docutils literal notranslate"><span class="pre">evt_1000_my_test_handler.py</span></code>, the endpoint for <code class="docutils literal notranslate"><span class="pre">echo()</span></code> will be <code class="docutils literal notranslate"><span class="pre">http(s)://&lt;your_domain&gt;/ducts/api/v1/my_test_handler/echo/{msg}</span></code>.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="index.html" class="btn btn-neutral float-left" title="DUCTS Documentation" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="client.html" class="btn btn-neutral float-right" title="Client" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2022, ifLab.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

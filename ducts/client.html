@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Client &mdash; DUCTS  documentation</title>
+      <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/doctools.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="prev" title="Server" href="server.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="index.html" class="icon icon-home"> DUCTS
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="server.html">Server</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="server.html#installation">Installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="server.html#creating-event-handlers">Creating Event Handlers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="server.html#event-handler-hooks">Event Handler Hooks</a></li>
+<li class="toctree-l2"><a class="reference internal" href="server.html#common-redis-usage">Common Redis Usage</a></li>
+<li class="toctree-l2"><a class="reference internal" href="server.html#routing-web-apis">Routing Web APIs</a></li>
+</ul>
+</li>
+</ul>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Client</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#installation-in-python">Installation (in Python)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#quick-start-example">Quick start example</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#communication-with-server">Communication with Server</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#send">Send</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#call">Call</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">DUCTS</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home"></a> &raquo;</li>
+      <li>Client</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/client.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="client">
+<h1>Client<a class="headerlink" href="#client" title="Permalink to this headline"></a></h1>
+<section id="installation-in-python">
+<h2>Installation (in Python)<a class="headerlink" href="#installation-in-python" title="Permalink to this headline"></a></h2>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">pip</span> <span class="n">install</span> <span class="n">ducts</span><span class="o">-</span><span class="n">client</span>
+</pre></div>
+</div>
+</section>
+<section id="quick-start-example">
+<h2>Quick start example<a class="headerlink" href="#quick-start-example" title="Permalink to this headline"></a></h2>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">asyncio</span>
+<span class="kn">from</span> <span class="nn">ducts_client</span> <span class="kn">import</span> <span class="n">Duct</span>
+
+<span class="k">async</span> <span class="k">def</span> <span class="nf">main</span><span class="p">():</span>
+    <span class="n">duct</span> <span class="o">=</span> <span class="n">Duct</span><span class="p">()</span>
+    <span class="k">await</span> <span class="n">duct</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s1">&#39;http://localhost:8888/ducts/wsd&#39;</span><span class="p">)</span>
+    <span class="c1"># You need to have handler/evt_####_my_test_event.py defined on server side first</span>
+    <span class="n">ret</span> <span class="o">=</span> <span class="k">await</span> <span class="n">duct</span><span class="o">.</span><span class="n">call</span><span class="p">(</span><span class="n">duct</span><span class="o">.</span><span class="n">EVENT</span><span class="p">[</span><span class="s1">&#39;MY_TEST_ECHO_EVENT&#39;</span><span class="p">])</span>
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s1">&#39;__main__&#39;</span><span class="p">:</span>
+    <span class="n">loop</span> <span class="o">=</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">get_event_loop</span><span class="p">()</span>
+    <span class="n">loop</span><span class="o">.</span><span class="n">create_task</span><span class="p">(</span><span class="n">main</span><span class="p">())</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">loop</span><span class="o">.</span><span class="n">run_forever</span><span class="p">()</span>
+    <span class="k">except</span> <span class="ne">KeyboardInterrupt</span><span class="p">:</span>
+        <span class="n">loop</span><span class="o">.</span><span class="n">stop</span><span class="p">()</span>
+</pre></div>
+</div>
+</section>
+<section id="communication-with-server">
+<h2>Communication with Server<a class="headerlink" href="#communication-with-server" title="Permalink to this headline"></a></h2>
+<p>DUCTS client provides two methods to make requests to server: <strong>send</strong> and <strong>call</strong>.</p>
+<section id="send">
+<h3>Send<a class="headerlink" href="#send" title="Permalink to this headline"></a></h3>
+<p>As WebSocket-based communication, each request and response occurs asynchronously, meaning requests are “sent” without waiting for response as a return value and responses are received in each event.</p>
+<p>For instance:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">async</span> <span class="k">def</span> <span class="nf">my_handler</span><span class="p">(</span><span class="n">rid</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">eid</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">Any</span><span class="p">):</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>   <span class="c1"># prints server response for the event</span>
+                  <span class="c1"># &quot;Here&#39;s my request!&quot;</span>
+    
+<span class="k">async</span> <span class="k">def</span> <span class="nf">main</span><span class="p">():</span>
+    <span class="n">duct</span><span class="o">.</span><span class="n">set_event_handler</span><span class="p">(</span><span class="n">duct</span><span class="o">.</span><span class="n">EVENT</span><span class="p">[</span><span class="s1">&#39;MY_TEST_ECHO_EVENT&#39;</span><span class="p">],</span> <span class="n">my_handler</span><span class="p">)</span>   <span class="c1"># set event listener</span>
+    <span class="k">await</span> <span class="n">duct</span><span class="o">.</span><span class="n">send</span><span class="p">(</span><span class="n">duct</span><span class="o">.</span><span class="n">next_rid</span><span class="p">(),</span> <span class="n">duct</span><span class="o">.</span><span class="n">EVENT</span><span class="p">[</span><span class="s1">&#39;MY_TEST_ECHO_EVENT&#39;</span><span class="p">],</span> <span class="s2">&quot;Here&#39;s my request!&quot;</span><span class="p">)</span>     <span class="c1"># send request</span>
+</pre></div>
+</div>
+<section id="making-requests">
+<h4>Making requests<a class="headerlink" href="#making-requests" title="Permalink to this headline"></a></h4>
+<p>For communication using <code class="docutils literal notranslate"><span class="pre">.send()</span></code>, three arguments needs to be specified: <code class="docutils literal notranslate"><span class="pre">rid</span></code>, <code class="docutils literal notranslate"><span class="pre">eid</span></code>, and <code class="docutils literal notranslate"><span class="pre">data</span></code>.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">await</span> <span class="n">duct</span><span class="o">.</span><span class="n">send</span><span class="p">(</span>
+    <span class="n">rid</span> <span class="o">=</span> <span class="n">duct</span><span class="o">.</span><span class="n">next_rid</span><span class="p">(),</span>
+    <span class="n">eid</span> <span class="o">=</span> <span class="n">duct</span><span class="o">.</span><span class="n">EVENT</span><span class="p">[</span><span class="s1">&#39;MY_TEST_ECHO_EVENT&#39;</span><span class="p">],</span>
+    <span class="n">data</span> <span class="o">=</span> <span class="s2">&quot;Here&#39;s my request!&quot;</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">rid</span></code> stands for “request ID”, which is an integer value that identifies each request.
+This is usually (or always, as long as no specific purpose is intended) a millisecond-precision UNIX timestamp – this can be easily obtained by calling <code class="docutils literal notranslate"><span class="pre">duct.next_rid()</span></code>.</p>
+<p><code class="docutils literal notranslate"><span class="pre">eid</span></code> stands for “event ID”, which is also an integer value that corresponds to the event ID of the event defined in the server’s <code class="docutils literal notranslate"><span class="pre">handler</span></code> directory.
+To get a list of all available events, refer to <code class="docutils literal notranslate"><span class="pre">duct.EVENT</span></code> after calling a successful <code class="docutils literal notranslate"><span class="pre">open()</span></code>.</p>
+<p><code class="docutils literal notranslate"><span class="pre">data</span></code> is a request data value of any primitive type including <code class="docutils literal notranslate"><span class="pre">list</span></code> and <code class="docutils literal notranslate"><span class="pre">dict</span></code>, but must be JSON-parsable.</p>
+</section>
+<section id="receiving-responses">
+<h4>Receiving responses<a class="headerlink" href="#receiving-responses" title="Permalink to this headline"></a></h4>
+<p>Before sending requests, set a handler function or coroutine for the corresponding event by calling <code class="docutils literal notranslate"><span class="pre">duct.set_event_handler()</span></code>.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">async</span> <span class="k">def</span> <span class="nf">my_handler</span><span class="p">(</span><span class="n">rid</span><span class="p">,</span> <span class="n">eid</span><span class="p">,</span> <span class="n">data</span><span class="p">):</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>     <span class="c1"># &quot;Here&#39;s my request!&quot;</span>
+
+<span class="o">...</span>
+
+<span class="n">duct</span><span class="o">.</span><span class="n">set_event_handler</span><span class="p">(</span>
+    <span class="n">eid</span> <span class="o">=</span> <span class="n">duct</span><span class="o">.</span><span class="n">EVENT</span><span class="p">[</span><span class="s1">&#39;MY_TEST_ECHO_EVENT&#39;</span><span class="p">],</span>
+    <span class="n">handler</span> <span class="o">=</span> <span class="n">my_handler</span>
+<span class="p">)</span>
+<span class="k">await</span> <span class="n">duct</span><span class="o">.</span><span class="n">send</span><span class="p">(</span><span class="n">duct</span><span class="o">.</span><span class="n">next_rid</span><span class="p">(),</span> <span class="n">duct</span><span class="o">.</span><span class="n">EVENT</span><span class="p">[</span><span class="s1">&#39;MY_TEST_ECHO_EVENT&#39;</span><span class="p">],</span> <span class="s2">&quot;Here&#39;s my request!&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="call">
+<h3>Call<a class="headerlink" href="#call" title="Permalink to this headline"></a></h3>
+<p>One-liner request &amp; response is also supported.
+With <code class="docutils literal notranslate"><span class="pre">duct.call()</span></code>, response can be received as a return value:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">ret</span> <span class="o">=</span> <span class="k">await</span> <span class="n">duct</span><span class="o">.</span><span class="n">call</span><span class="p">(</span><span class="n">duct</span><span class="o">.</span><span class="n">EVENT</span><span class="p">[</span><span class="s1">&#39;MY_TEST_ECHO_EVENT&#39;</span><span class="p">],</span> <span class="s2">&quot;Here&#39;s my request!&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">ret</span><span class="p">)</span>  <span class="c1"># &quot;Here&#39;s my request!&quot;</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Note that <code class="docutils literal notranslate"><span class="pre">send</span></code> and <code class="docutils literal notranslate"><span class="pre">call</span></code> have different purposes, therefore they both needs to be used properly depending on use cases.
+<code class="docutils literal notranslate"><span class="pre">send()</span></code> literally “sends” requests and proceeds to the next code line immediately once the request is made, while <code class="docutils literal notranslate"><span class="pre">call()</span></code> awaits a response (thereby preventing following lines from being executed until it receives a response or the request times out.</p>
+</div>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="server.html" class="btn btn-neutral float-left" title="Server" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2022, ifLab.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

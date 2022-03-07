@@ -1,0 +1,103 @@
+# Client
+
+## Installation (in Python)
+
+```
+pip install ducts-client
+```
+
+## Quick start example
+
+```
+import asyncio
+from ducts_client import Duct
+
+async def main():
+    duct = Duct()
+    await duct.open('http://localhost:8888/ducts/wsd')
+    # You need to have handler/evt_####_my_test_event.py defined on server side first
+    ret = await duct.call(duct.EVENT['MY_TEST_ECHO_EVENT'])
+
+if __name__ == '__main__':
+    loop = asyncio.get_event_loop()
+    loop.create_task(main())
+    try:
+        loop.run_forever()
+    except KeyboardInterrupt:
+        loop.stop()
+```
+
+## Communication with Server
+
+DUCTS client provides two methods to make requests to server: **send** and **call**.
+
+### Send
+
+As WebSocket-based communication, each request and response occurs asynchronously, meaning requests are "sent" without waiting for response as a return value and responses are received in each event.
+
+For instance:
+
+```python
+async def my_handler(rid: int, eid: int, data: Any):
+    print(data)   # prints server response for the event
+                  # "Here's my request!"
+    
+async def main():
+    duct.set_event_handler(duct.EVENT['MY_TEST_ECHO_EVENT'], my_handler)   # set event listener
+    await duct.send(duct.next_rid(), duct.EVENT['MY_TEST_ECHO_EVENT'], "Here's my request!")     # send request
+```
+
+```{eval-rst}
+.. client-making-requests:
+```
+#### Making requests
+
+For communication using `.send()`, three arguments needs to be specified: `rid`, `eid`, and `data`.
+
+```
+await duct.send(
+    rid = duct.next_rid(),
+    eid = duct.EVENT['MY_TEST_ECHO_EVENT'],
+    data = "Here's my request!"
+)
+```
+
+`rid` stands for "request ID", which is an integer value that identifies each request.
+This is usually (or always, as long as no specific purpose is intended) a millisecond-precision UNIX timestamp -- this can be easily obtained by calling `duct.next_rid()`.
+
+`eid` stands for "event ID", which is also an integer value that corresponds to the event ID of the event defined in the server's `handler` directory.
+To get a list of all available events, refer to `duct.EVENT` after calling a successful `open()`.
+
+`data` is a request data value of any primitive type including `list` and `dict`, but must be JSON-parsable.
+
+#### Receiving responses
+
+Before sending requests, set a handler function or coroutine for the corresponding event by calling `duct.set_event_handler()`.
+
+```
+async def my_handler(rid, eid, data):
+    print(data)     # "Here's my request!"
+
+...
+
+duct.set_event_handler(
+    eid = duct.EVENT['MY_TEST_ECHO_EVENT'],
+    handler = my_handler
+)
+await duct.send(duct.next_rid(), duct.EVENT['MY_TEST_ECHO_EVENT'], "Here's my request!")
+```
+
+### Call
+
+One-liner request & response is also supported.
+With `duct.call()`, response can be received as a return value:
+
+```
+ret = await duct.call(duct.EVENT['MY_TEST_ECHO_EVENT'], "Here's my request!")
+print(ret)  # "Here's my request!"
+```
+
+```{note}
+Note that `send` and `call` have different purposes, therefore they both needs to be used properly depending on use cases.
+`send()` literally "sends" requests and proceeds to the next code line immediately once the request is made, while `call()` awaits a response (thereby preventing following lines from being executed until it receives a response or the request times out.
+```

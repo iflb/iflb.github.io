@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ducts.redis &mdash; DUCTS  documentation</title>
+      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
+        <script src="../../_static/jquery.js"></script>
+        <script src="../../_static/underscore.js"></script>
+        <script src="../../_static/doctools.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../../index.html" class="icon icon-home"> DUCTS
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../server.html">Server</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../server.html#installation">Installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../server.html#creating-event-handlers">Creating Event Handlers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../server.html#event-handler-hooks">Event Handler Hooks</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../server.html#common-redis-usage">Common Redis Usage</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../server.html#routing-web-apis">Routing Web APIs</a></li>
+</ul>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../client.html">Client</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../client.html#installation-in-python">Installation (in Python)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../client.html#quick-start-example">Quick start example</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../client.html#communication-with-server">Communication with Server</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../client.html#send">Send</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../client.html#call">Call</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">DUCTS</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="../index.html">Module code</a> &raquo;</li>
+      <li>ducts.redis</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for ducts.redis</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+
+<span class="kn">import</span> <span class="nn">inspect</span>
+<span class="kn">import</span> <span class="nn">functools</span>
+<span class="kn">import</span> <span class="nn">itertools</span>
+<span class="kn">import</span> <span class="nn">hashlib</span>
+<span class="kn">from</span> <span class="nn">collections</span> <span class="kn">import</span> <span class="n">defaultdict</span>
+
+<span class="kn">import</span> <span class="nn">asyncio</span>
+<span class="kn">import</span> <span class="nn">aioredis</span>
+
+<span class="kn">from</span> <span class="nn">.spi</span> <span class="kn">import</span> <span class="n">RedisClient</span> <span class="k">as</span> <span class="n">RedisClientAPI</span>
+
+<span class="kn">from</span> <span class="nn">ifconf</span> <span class="kn">import</span> <span class="n">configure_module</span><span class="p">,</span> <span class="n">config_callback</span><span class="p">,</span> <span class="n">configure_main</span>
+
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+<span class="nd">@config_callback</span>
+<span class="k">def</span> <span class="nf">config</span><span class="p">(</span><span class="n">loader</span><span class="p">):</span>
+    <span class="n">loader</span><span class="o">.</span><span class="n">add_attr</span><span class="p">(</span><span class="s1">&#39;redis_uri_main&#39;</span><span class="p">,</span> <span class="s1">&#39;redis://localhost:6379/0?encoding=utf-8&#39;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;redis uri to connect&#39;</span><span class="p">)</span> <span class="c1"># or uri &#39;unix:///path/to/redis/socket?db=1&#39;</span>
+    <span class="c1">#loader.add_attr(&#39;redis_uri_logging&#39;, &#39;redis://localhost:6379/1?encoding=utf-8&#39;, help=&#39;redis uri to connect&#39;) # or uri &#39;unix:///path/to/redis/socket?db=1&#39;</span>
+
+
+<div class="viewcode-block" id="RedisClient"><a class="viewcode-back" href="../../server.html#ducts.redis.RedisClient">[docs]</a><span class="k">class</span> <span class="nc">RedisClient</span><span class="p">(</span><span class="n">RedisClientAPI</span><span class="p">):</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">loop</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">conf</span> <span class="o">=</span> <span class="n">configure_module</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">loop</span> <span class="o">=</span> <span class="n">loop</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">conn</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">conn_for_subscription</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">count</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_subs</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_psubs</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_script_sha1</span> <span class="o">=</span> <span class="n">sha1_loader</span><span class="p">()</span>
+
+<div class="viewcode-block" id="RedisClient.connect"><a class="viewcode-back" href="../../server.html#ducts.redis.RedisClient.connect">[docs]</a>    <span class="k">async</span> <span class="k">def</span> <span class="nf">connect</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">conn</span> <span class="o">=</span> <span class="k">await</span> <span class="n">aioredis</span><span class="o">.</span><span class="n">create_redis_pool</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">conf</span><span class="o">.</span><span class="n">redis_uri_main</span><span class="p">,</span> <span class="n">minsize</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">maxsize</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">conn_for_subscription</span> <span class="o">=</span> <span class="k">await</span> <span class="n">aioredis</span><span class="o">.</span><span class="n">create_redis_pool</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">conf</span><span class="o">.</span><span class="n">redis_uri_main</span><span class="p">,</span> <span class="n">minsize</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">maxsize</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+        <span class="c1">#self.conn_for_logging = await aioredis.create_redis_pool(self.conf.redis_uri_logging, minsize=1, maxsize=1)</span>
+        <span class="c1">#self.main_conn_shared = await aioredis.create_redis_pool(self.conf.redis_uri_main)</span>
+        <span class="c1">#self.main_conn_exclusive = await aioredis.create_redis_pool(self.conf.redis_uri_main, minsize=1, maxsize=20)</span>
+        <span class="c1">#self.logging_conn = await aioredis.create_redis_pool(self.conf.redis_uri_logging)</span>
+        <span class="c1">#logger.notice(&#39;CONNECTED|URL=%s&#39;.format(self.main_conn_shared.address))</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">notice</span><span class="p">(</span><span class="s1">&#39;CONNECTED|URL=</span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">conn</span><span class="o">.</span><span class="n">address</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="RedisClient.connect_for_blocking"><a class="viewcode-back" href="../../server.html#ducts.redis.RedisClient.connect_for_blocking">[docs]</a>    <span class="k">async</span> <span class="k">def</span> <span class="nf">connect_for_blocking</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">minsize</span><span class="p">,</span> <span class="n">maxsize</span><span class="p">):</span>
+        <span class="k">return</span> <span class="k">await</span> <span class="n">aioredis</span><span class="o">.</span><span class="n">create_redis_pool</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">conf</span><span class="o">.</span><span class="n">redis_uri_main</span><span class="p">,</span> <span class="n">minsize</span><span class="o">=</span><span class="n">minsize</span><span class="p">,</span> <span class="n">maxsize</span><span class="o">=</span><span class="n">maxsize</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="RedisClient.execute_threadsafe"><a class="viewcode-back" href="../../server.html#ducts.redis.RedisClient.execute_threadsafe">[docs]</a>    <span class="k">def</span> <span class="nf">execute_threadsafe</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">func</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="c1">#raw_result = self.loop.call_soon_threadsafe(functools.partial(self.conn.execute, cmd, *args))</span>
+        <span class="k">async</span> <span class="k">def</span> <span class="nf">wrap</span><span class="p">():</span>
+            <span class="n">ret</span> <span class="o">=</span> <span class="n">func</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">inspect</span><span class="o">.</span><span class="n">isawaitable</span><span class="p">(</span><span class="n">ret</span><span class="p">):</span>
+                <span class="k">return</span> <span class="k">await</span> <span class="n">ret</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">ret</span>
+        <span class="n">coro</span> <span class="o">=</span> <span class="n">func</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="k">if</span> <span class="n">inspect</span><span class="o">.</span><span class="n">iscoroutinefunction</span><span class="p">(</span><span class="n">func</span><span class="p">)</span> <span class="k">else</span> <span class="n">wrap</span><span class="p">()</span>
+        <span class="n">future</span> <span class="o">=</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">run_coroutine_threadsafe</span><span class="p">(</span><span class="n">coro</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">loop</span><span class="p">)</span>
+        <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">ret</span> <span class="o">=</span> <span class="n">future</span><span class="o">.</span><span class="n">result</span><span class="p">(</span><span class="mi">10</span><span class="p">)</span>
+            <span class="k">except</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">TimeoutError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="s1">&#39;REDIS_EXECUTE_THREADSAFE|TIMEOUT|FUTURE=</span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">future</span><span class="p">)</span>
+                <span class="k">continue</span>
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">exception</span><span class="p">(</span><span class="s1">&#39;REDIS_EXECUTE_THREADSAFE|ERROR=</span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span>
+                <span class="n">ret</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>
+                <span class="k">break</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">break</span>
+        <span class="k">return</span> <span class="n">ret</span></div>
+
+<div class="viewcode-block" id="RedisClient.execute"><a class="viewcode-back" href="../../server.html#ducts.redis.RedisClient.execute">[docs]</a>    <span class="k">async</span> <span class="k">def</span> <span class="nf">execute</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cmd</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">):</span>
+        <span class="k">return</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">conn</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">cmd</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></div>
+            
+<div class="viewcode-block" id="RedisClient.execute_str"><a class="viewcode-back" href="../../server.html#ducts.redis.RedisClient.execute_str">[docs]</a>    <span class="k">async</span> <span class="k">def</span> <span class="nf">execute_str</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cmd</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">):</span>
+        <span class="k">return</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">conn</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">cmd</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s1">&#39;UTF-8&#39;</span><span class="p">)</span></div>
+            
+<div class="viewcode-block" id="RedisClient.subscribe"><a class="viewcode-back" href="../../server.html#ducts.redis.RedisClient.subscribe">[docs]</a>    <span class="k">async</span> <span class="k">def</span> <span class="nf">subscribe</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_subs</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_subs</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
+        <span class="n">ch</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">conn_for_subscription</span><span class="o">.</span><span class="n">subscribe</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+        <span class="n">ch</span> <span class="o">=</span> <span class="n">ChannelForMultiConsumer</span><span class="p">(</span><span class="n">ch</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">loop</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_subs</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">ch</span>
+        <span class="k">return</span> <span class="n">ch</span></div>
+        
+<div class="viewcode-block" id="RedisClient.unsubscribe"><a class="viewcode-back" href="../../server.html#ducts.redis.RedisClient.unsubscribe">[docs]</a>    <span class="k">async</span> <span class="k">def</span> <span class="nf">unsubscribe</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key_or_channel</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">key_or_channel</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_subs</span><span class="p">:</span>
+            <span class="n">ch</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_subs</span><span class="p">[</span><span class="n">key_or_channel</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">ch</span><span class="o">.</span><span class="n">unsubscribed</span><span class="p">():</span>
+                <span class="k">return</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">conn_for_subscription</span><span class="o">.</span><span class="n">unsubscribe</span><span class="p">(</span><span class="n">key_or_channel</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">ch</span><span class="o">.</span><span class="n">_channel</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">conn_for_subscription</span><span class="o">.</span><span class="n">unsubscribe</span><span class="p">(</span><span class="n">key_or_channel</span><span class="p">)</span></div>
+        
+<div class="viewcode-block" id="RedisClient.psubscribe"><a class="viewcode-back" href="../../server.html#ducts.redis.RedisClient.psubscribe">[docs]</a>    <span class="k">async</span> <span class="k">def</span> <span class="nf">psubscribe</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_psubs</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_psubs</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
+        <span class="n">ch</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">conn_for_subscription</span><span class="o">.</span><span class="n">psubscribe</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+        <span class="n">ch</span> <span class="o">=</span> <span class="n">ChannelForMultiConsumer</span><span class="p">(</span><span class="n">ch</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">loop</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_psubs</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">ch</span>
+        <span class="k">return</span> <span class="n">ch</span></div>
+        
+<div class="viewcode-block" id="RedisClient.punsubscribe"><a class="viewcode-back" href="../../server.html#ducts.redis.RedisClient.punsubscribe">[docs]</a>    <span class="k">async</span> <span class="k">def</span> <span class="nf">punsubscribe</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key_or_channel</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">key_or_channel</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_psubs</span><span class="p">:</span>
+            <span class="n">ch</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_psubs</span><span class="p">[</span><span class="n">key_or_channel</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">ch</span><span class="o">.</span><span class="n">unsubscribed</span><span class="p">():</span>
+                <span class="k">return</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">conn_for_subscription</span><span class="o">.</span><span class="n">punsubscribe</span><span class="p">(</span><span class="n">key_or_channel</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">ch</span><span class="o">.</span><span class="n">_channel</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">conn_for_subscription</span><span class="o">.</span><span class="n">punsubscribe</span><span class="p">(</span><span class="n">key_or_channel</span><span class="p">)</span></div>
+        
+<div class="viewcode-block" id="RedisClient.xadd"><a class="viewcode-back" href="../../server.html#ducts.redis.RedisClient.xadd">[docs]</a>    <span class="k">async</span> <span class="k">def</span> <span class="nf">xadd</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">streamkey</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="k">return</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s1">&#39;XADD&#39;</span><span class="p">,</span> <span class="n">streamkey</span><span class="p">,</span> <span class="s1">&#39;*&#39;</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">*</span><span class="n">itertools</span><span class="o">.</span><span class="n">chain</span><span class="o">.</span><span class="n">from_iterable</span><span class="p">(</span><span class="n">kwargs</span><span class="o">.</span><span class="n">items</span><span class="p">()))</span></div>
+        
+<div class="viewcode-block" id="RedisClient.xadd_and_publish"><a class="viewcode-back" href="../../server.html#ducts.redis.RedisClient.xadd_and_publish">[docs]</a>    <span class="k">async</span> <span class="k">def</span> <span class="nf">xadd_and_publish</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pubkey</span><span class="p">,</span> <span class="n">streamkey</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="n">stream_id</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s1">&#39;XADD&#39;</span><span class="p">,</span> <span class="n">streamkey</span><span class="p">,</span> <span class="s1">&#39;*&#39;</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">*</span><span class="n">itertools</span><span class="o">.</span><span class="n">chain</span><span class="o">.</span><span class="n">from_iterable</span><span class="p">(</span><span class="n">kwargs</span><span class="o">.</span><span class="n">items</span><span class="p">()))</span>
+        <span class="k">return</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s1">&#39;PUBLISH&#39;</span><span class="p">,</span> <span class="n">pubkey</span><span class="p">,</span> <span class="n">stream_id</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="RedisClient.xget_str"><a class="viewcode-back" href="../../server.html#ducts.redis.RedisClient.xget_str">[docs]</a>    <span class="k">async</span> <span class="k">def</span> <span class="nf">xget_str</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">streamkey</span><span class="p">,</span> <span class="n">stream_id</span><span class="p">):</span>
+        <span class="n">ret</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">execute_str</span><span class="p">(</span><span class="s1">&#39;XREVRANGE&#39;</span><span class="p">,</span> <span class="n">streamkey</span><span class="p">,</span> <span class="n">stream_id</span><span class="p">,</span> <span class="n">stream_id</span><span class="p">,</span> <span class="s1">&#39;COUNT&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">{</span><span class="n">v</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="p">:</span> <span class="n">v</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="o">*</span><span class="p">[</span><span class="nb">iter</span><span class="p">(</span><span class="n">ret</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">1</span><span class="p">])]</span><span class="o">*</span><span class="mi">2</span><span class="p">)}</span> <span class="k">if</span> <span class="n">ret</span> <span class="k">else</span> <span class="p">{}</span></div>
+
+<div class="viewcode-block" id="RedisClient.xget_str_with_id"><a class="viewcode-back" href="../../server.html#ducts.redis.RedisClient.xget_str_with_id">[docs]</a>    <span class="k">async</span> <span class="k">def</span> <span class="nf">xget_str_with_id</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">streamkey</span><span class="p">,</span> <span class="n">stream_id</span><span class="p">):</span>
+        <span class="n">ret</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">execute_str</span><span class="p">(</span><span class="s1">&#39;XREVRANGE&#39;</span><span class="p">,</span> <span class="n">streamkey</span><span class="p">,</span> <span class="n">stream_id</span><span class="p">,</span> <span class="n">stream_id</span><span class="p">,</span> <span class="s1">&#39;COUNT&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">(</span><span class="n">ret</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">],</span> <span class="nb">dict</span><span class="p">({</span><span class="n">v</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="p">:</span> <span class="n">v</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="o">*</span><span class="p">[</span><span class="nb">iter</span><span class="p">(</span><span class="n">ret</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">1</span><span class="p">])]</span><span class="o">*</span><span class="mi">2</span><span class="p">)}))</span> <span class="k">if</span> <span class="n">ret</span> <span class="k">else</span> <span class="p">(</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="p">{})</span></div>
+
+<div class="viewcode-block" id="RedisClient.xlast_str"><a class="viewcode-back" href="../../server.html#ducts.redis.RedisClient.xlast_str">[docs]</a>    <span class="k">async</span> <span class="k">def</span> <span class="nf">xlast_str</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">streamkey</span><span class="p">):</span>
+        <span class="n">ret</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">execute_str</span><span class="p">(</span><span class="s1">&#39;XREVRANGE&#39;</span><span class="p">,</span> <span class="n">streamkey</span><span class="p">,</span> <span class="s1">&#39;+&#39;</span><span class="p">,</span> <span class="s1">&#39;-&#39;</span><span class="p">,</span> <span class="s1">&#39;COUNT&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">{</span><span class="n">v</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="p">:</span> <span class="n">v</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="o">*</span><span class="p">[</span><span class="nb">iter</span><span class="p">(</span><span class="n">ret</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">1</span><span class="p">])]</span><span class="o">*</span><span class="mi">2</span><span class="p">)}</span> <span class="k">if</span> <span class="n">ret</span> <span class="k">else</span> <span class="p">{}</span></div>
+
+<div class="viewcode-block" id="RedisClient.xlast_str_with_id"><a class="viewcode-back" href="../../server.html#ducts.redis.RedisClient.xlast_str_with_id">[docs]</a>    <span class="k">async</span> <span class="k">def</span> <span class="nf">xlast_str_with_id</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">streamkey</span><span class="p">):</span>
+        <span class="n">ret</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">execute_str</span><span class="p">(</span><span class="s1">&#39;XREVRANGE&#39;</span><span class="p">,</span> <span class="n">streamkey</span><span class="p">,</span> <span class="s1">&#39;+&#39;</span><span class="p">,</span> <span class="s1">&#39;-&#39;</span><span class="p">,</span> <span class="s1">&#39;COUNT&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">(</span><span class="n">ret</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">],</span> <span class="nb">dict</span><span class="p">({</span><span class="n">v</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="p">:</span> <span class="n">v</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="o">*</span><span class="p">[</span><span class="nb">iter</span><span class="p">(</span><span class="n">ret</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">1</span><span class="p">])]</span><span class="o">*</span><span class="mi">2</span><span class="p">)}))</span> <span class="k">if</span> <span class="n">ret</span> <span class="k">else</span> <span class="p">(</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="p">{})</span></div>
+
+<div class="viewcode-block" id="RedisClient.hget_all_str"><a class="viewcode-back" href="../../server.html#ducts.redis.RedisClient.hget_all_str">[docs]</a>    <span class="k">async</span> <span class="k">def</span> <span class="nf">hget_all_str</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
+        <span class="n">ret</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">execute_str</span><span class="p">(</span><span class="s1">&#39;HGETALL&#39;</span><span class="p">,</span> <span class="n">key</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">{</span><span class="n">v</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="p">:</span> <span class="n">v</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="o">*</span><span class="p">[</span><span class="nb">iter</span><span class="p">(</span><span class="n">ret</span><span class="p">)]</span><span class="o">*</span><span class="mi">2</span><span class="p">)}</span> <span class="k">if</span> <span class="n">ret</span> <span class="k">else</span> <span class="p">{}</span></div>
+
+    <span class="c1">#https://github.com/aio-libs/aioredis/issues/310</span>
+    <span class="c1">#https://github.com/aio-libs/aioredis/issues/369</span>
+    <span class="c1">#https://github.com/aio-libs/aioredis/pull/373</span>
+<div class="viewcode-block" id="RedisClient.psub_and_xrange_str"><a class="viewcode-back" href="../../server.html#ducts.redis.RedisClient.psub_and_xrange_str">[docs]</a>    <span class="k">async</span> <span class="k">def</span> <span class="nf">psub_and_xrange_str</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">subkey</span><span class="p">,</span> <span class="n">streamkey</span><span class="p">,</span> <span class="n">last_count</span> <span class="o">=</span> <span class="mi">0</span><span class="p">):</span>
+        <span class="c1">#logger.info(&quot;pubsub_channels=%s&quot;, self.conn_for_subscription.pubsub_channels())</span>
+        <span class="c1">#ch = (await self.psubscribe(subkey))[0]</span>
+        <span class="n">ch</span> <span class="o">=</span> <span class="p">(</span><span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">psubscribe</span><span class="p">(</span><span class="n">subkey</span><span class="p">))</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s1">&#39;PSUBSCRIBE|CHANNEL=</span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">ch</span><span class="p">)</span>
+        <span class="n">last_id</span> <span class="o">=</span> <span class="s1">&#39;0&#39;</span>
+        <span class="k">if</span> <span class="n">last_count</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">ret</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">execute_str</span><span class="p">(</span><span class="s1">&#39;XREVRANGE&#39;</span><span class="p">,</span> <span class="n">streamkey</span><span class="p">,</span> <span class="s1">&#39;+&#39;</span><span class="p">,</span> <span class="s1">&#39;-&#39;</span><span class="p">,</span> <span class="s1">&#39;COUNT&#39;</span><span class="p">,</span> <span class="n">last_count</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">result</span> <span class="ow">in</span> <span class="nb">reversed</span><span class="p">(</span><span class="n">ret</span><span class="p">):</span>
+                <span class="n">last_id</span> <span class="o">=</span> <span class="n">result</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+                <span class="k">yield</span> <span class="p">{</span><span class="n">v</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="p">:</span> <span class="n">v</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="o">*</span><span class="p">[</span><span class="nb">iter</span><span class="p">(</span><span class="n">result</span><span class="p">[</span><span class="mi">1</span><span class="p">])]</span><span class="o">*</span><span class="mi">2</span><span class="p">)}</span>
+        <span class="k">async</span> <span class="k">for</span> <span class="n">msg</span> <span class="ow">in</span> <span class="n">ch</span><span class="o">.</span><span class="n">iter</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">msg</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s1">&#39;PSUBSCRIBE|CHANNEL=</span><span class="si">%s</span><span class="s1">|CLOSED&#39;</span><span class="p">,</span> <span class="n">ch</span><span class="p">)</span>
+                <span class="k">break</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s1">&#39;PSUBSCRIBE|CHANNEL=</span><span class="si">%s</span><span class="s1">|MSG=</span><span class="si">%s</span><span class="s1">:</span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">ch</span><span class="p">,</span> <span class="n">msg</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="nb">type</span><span class="p">(</span><span class="n">msg</span><span class="p">[</span><span class="mi">1</span><span class="p">]))</span>
+            <span class="n">ret</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">execute_str</span><span class="p">(</span><span class="s1">&#39;XRANGE&#39;</span><span class="p">,</span> <span class="n">streamkey</span><span class="p">,</span> <span class="n">last_id</span><span class="o">+</span><span class="s1">&#39;1&#39;</span><span class="p">,</span> <span class="s1">&#39;+&#39;</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s1">&#39;XRANGE|STREAM=</span><span class="si">%s</span><span class="s1">|LAST_ID=</span><span class="si">%s</span><span class="s1">|ret=</span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">streamkey</span><span class="p">,</span> <span class="n">last_id</span><span class="p">,</span> <span class="n">ret</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">ret</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">continue</span>
+            <span class="k">for</span> <span class="n">result</span> <span class="ow">in</span> <span class="n">ret</span><span class="p">:</span>
+                <span class="n">last_id</span> <span class="o">=</span> <span class="n">result</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+                <span class="k">yield</span> <span class="p">{</span><span class="n">v</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="p">:</span> <span class="n">v</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="o">*</span><span class="p">[</span><span class="nb">iter</span><span class="p">(</span><span class="n">result</span><span class="p">[</span><span class="mi">1</span><span class="p">])]</span><span class="o">*</span><span class="mi">2</span><span class="p">)}</span> </div>
+        
+<div class="viewcode-block" id="RedisClient.psub_and_xrange_str_for_each_id"><a class="viewcode-back" href="../../server.html#ducts.redis.RedisClient.psub_and_xrange_str_for_each_id">[docs]</a>    <span class="k">async</span> <span class="k">def</span> <span class="nf">psub_and_xrange_str_for_each_id</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">subkey</span><span class="p">,</span> <span class="n">streamkey</span><span class="p">):</span>
+        <span class="c1">#ch = (await self.psubscribe(subkey))[0]</span>
+        <span class="n">ch</span> <span class="o">=</span> <span class="p">(</span><span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">psubscribe</span><span class="p">(</span><span class="n">subkey</span><span class="p">))</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s1">&#39;PSUBSCRIBE|CHANNEL=</span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">ch</span><span class="p">)</span>
+        <span class="k">async</span> <span class="k">for</span> <span class="n">msg</span> <span class="ow">in</span> <span class="n">ch</span><span class="o">.</span><span class="n">iter</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">msg</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s1">&#39;PSUBSCRIBE|CHANNEL=</span><span class="si">%s</span><span class="s1">|MSG=None&#39;</span><span class="p">,</span> <span class="n">ch</span><span class="p">)</span>
+                <span class="k">break</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s1">&#39;PSUBSCRIBE|CHANNEL=</span><span class="si">%s</span><span class="s1">|MSG=</span><span class="si">%s</span><span class="s1">:</span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">ch</span><span class="p">,</span> <span class="n">msg</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">msg</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+                <span class="n">ret</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">execute_str</span><span class="p">(</span><span class="s1">&#39;XRANGE&#39;</span><span class="p">,</span> <span class="n">streamkey</span><span class="p">,</span> <span class="n">msg</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">msg</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s1">&#39;XRANGE|STREAM=</span><span class="si">%s</span><span class="s1">|ID=</span><span class="si">%s</span><span class="s1">|RET=</span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">streamkey</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="n">ret</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">ret</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="k">continue</span>
+                <span class="k">for</span> <span class="n">result</span> <span class="ow">in</span> <span class="n">ret</span><span class="p">:</span>
+                    <span class="k">yield</span> <span class="p">{</span><span class="n">v</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="p">:</span> <span class="n">v</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="o">*</span><span class="p">[</span><span class="nb">iter</span><span class="p">(</span><span class="n">result</span><span class="p">[</span><span class="mi">1</span><span class="p">])]</span><span class="o">*</span><span class="mi">2</span><span class="p">)}</span></div>
+
+<div class="viewcode-block" id="RedisClient.scan_for"><a class="viewcode-back" href="../../server.html#ducts.redis.RedisClient.scan_for">[docs]</a>    <span class="k">async</span> <span class="k">def</span> <span class="nf">scan_for</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pattern</span><span class="p">,</span> <span class="n">count</span> <span class="o">=</span> <span class="mi">10</span><span class="p">):</span>
+        <span class="n">cursor</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+            <span class="n">ret</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">execute_str</span><span class="p">(</span><span class="s1">&#39;SCAN&#39;</span><span class="p">,</span> <span class="n">cursor</span><span class="p">,</span> <span class="s1">&#39;MATCH&#39;</span><span class="p">,</span> <span class="n">pattern</span><span class="p">,</span> <span class="s1">&#39;COUNT&#39;</span><span class="p">,</span> <span class="n">count</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">ret</span><span class="p">[</span><span class="mi">1</span><span class="p">]:</span>
+                <span class="k">yield</span> <span class="n">key</span>
+            <span class="n">cursor</span> <span class="o">=</span> <span class="n">ret</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">cursor</span> <span class="o">==</span> <span class="s1">&#39;0&#39;</span><span class="p">:</span>
+                <span class="k">break</span></div>
+
+<div class="viewcode-block" id="RedisClient.xrevrange_str"><a class="viewcode-back" href="../../server.html#ducts.redis.RedisClient.xrevrange_str">[docs]</a>    <span class="k">async</span> <span class="k">def</span> <span class="nf">xrevrange_str</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">streamkey</span><span class="p">,</span> <span class="n">start</span> <span class="o">=</span> <span class="s1">&#39;+&#39;</span><span class="p">,</span> <span class="n">stop</span> <span class="o">=</span> <span class="s1">&#39;-&#39;</span><span class="p">,</span> <span class="n">count</span> <span class="o">=</span> <span class="mi">10</span><span class="p">):</span>
+        <span class="n">ret</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">execute_str</span><span class="p">(</span><span class="s1">&#39;XREVRANGE&#39;</span><span class="p">,</span> <span class="n">streamkey</span><span class="p">,</span> <span class="n">start</span><span class="p">,</span> <span class="n">stop</span><span class="p">,</span> <span class="s1">&#39;COUNT&#39;</span><span class="p">,</span> <span class="n">count</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">ret</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">()</span>
+        <span class="k">return</span> <span class="p">((</span><span class="n">row</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="p">{</span><span class="n">pair</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="p">:</span> <span class="n">pair</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="k">for</span> <span class="n">pair</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="o">*</span><span class="p">[</span><span class="nb">iter</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="mi">1</span><span class="p">])]</span><span class="o">*</span><span class="mi">2</span><span class="p">)})</span> <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">ret</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="RedisClient.evalsha"><a class="viewcode-back" href="../../server.html#ducts.redis.RedisClient.evalsha">[docs]</a>    <span class="k">async</span> <span class="k">def</span> <span class="nf">evalsha</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">script</span><span class="p">,</span> <span class="n">numkeys</span><span class="p">,</span> <span class="o">*</span><span class="n">params</span><span class="p">):</span>
+        <span class="c1">#print(script)</span>
+        <span class="n">sha1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_script_sha1</span><span class="p">(</span><span class="n">script</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s1">&#39;EVALSHA&#39;</span><span class="p">,</span> <span class="n">sha1</span><span class="p">,</span> <span class="n">numkeys</span><span class="p">,</span> <span class="o">*</span><span class="n">params</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s1">&#39;EVALSHA|FAILED_LOAD_CACHE|</span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span>
+            <span class="k">return</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s1">&#39;EVAL&#39;</span><span class="p">,</span> <span class="n">script</span><span class="p">,</span> <span class="n">numkeys</span><span class="p">,</span> <span class="o">*</span><span class="n">params</span><span class="p">)</span></div>
+            
+    
+<div class="viewcode-block" id="RedisClient.close"><a class="viewcode-back" href="../../server.html#ducts.redis.RedisClient.close">[docs]</a>    <span class="k">async</span> <span class="k">def</span> <span class="nf">close</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1">#to_close = [con for con in (self.conn_for_subscription, self.conn_for_logging, self.conn) if con != None]</span>
+        <span class="n">to_close</span> <span class="o">=</span> <span class="p">[</span><span class="n">con</span> <span class="k">for</span> <span class="n">con</span> <span class="ow">in</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">conn_for_subscription</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">conn</span><span class="p">)</span> <span class="k">if</span> <span class="n">con</span> <span class="o">!=</span> <span class="kc">None</span><span class="p">]</span>
+        <span class="p">[</span><span class="n">con</span><span class="o">.</span><span class="n">close</span><span class="p">()</span> <span class="k">for</span> <span class="n">con</span> <span class="ow">in</span> <span class="n">to_close</span><span class="p">]</span>
+        <span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">gather</span><span class="p">(</span><span class="o">*</span><span class="p">[</span><span class="n">con</span><span class="o">.</span><span class="n">wait_closed</span><span class="p">()</span> <span class="k">for</span> <span class="n">con</span> <span class="ow">in</span> <span class="n">to_close</span><span class="p">])</span></div>
+
+    <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">    async def blocking_command(self, coroutine):</span>
+<span class="sd">        with await self.main_conn_exclusive as conn:</span>
+<span class="sd">            await coroutine(conn)</span>
+
+<span class="sd">    async def blocking_execute(self, cmd, *args):</span>
+<span class="sd">        with await redis as r:</span>
+<span class="sd">            await self.conn.execute(cmd, *args)</span>
+
+<span class="sd">    </span>
+<span class="sd">    async def get_and_wait(self, key):</span>
+<span class="sd">        value = self.conn.get(key)</span>
+<span class="sd">        if not value:</span>
+<span class="sd">            ret = await conn.publish(&#39;test&#39;, key)</span>
+<span class="sd">    &#39;&#39;&#39;</span></div>
+
+<span class="k">class</span> <span class="nc">sha1_loader</span><span class="p">:</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">db</span> <span class="o">=</span> <span class="p">{}</span>
+            
+    <span class="k">def</span> <span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">script</span><span class="p">):</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">db</span><span class="p">[</span><span class="n">script</span><span class="p">]</span>
+        <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+            <span class="n">sha1</span> <span class="o">=</span> <span class="n">hashlib</span><span class="o">.</span><span class="n">sha1</span><span class="p">(</span><span class="n">script</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s1">&#39;UTF-8&#39;</span><span class="p">))</span><span class="o">.</span><span class="n">hexdigest</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">db</span><span class="p">[</span><span class="n">script</span><span class="p">]</span> <span class="o">=</span> <span class="n">sha1</span>
+            <span class="k">return</span> <span class="n">sha1</span>
+
+    
+<span class="c1">#https://github.com/aio-libs/aioredis/issues/310</span>
+<span class="c1">#https://stackoverflow.com/questions/54159292/how-to-implement-single-producer-multi-consumer-with-aioredis-pub-sub</span>
+<span class="k">class</span> <span class="nc">ChannelForMultiConsumer</span><span class="p">:</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">channel</span><span class="p">,</span> <span class="n">loop</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_future</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_channel</span> <span class="o">=</span> <span class="n">channel</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_loop</span> <span class="o">=</span> <span class="n">loop</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">loop</span> <span class="k">else</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">get_event_loop</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_count</span> <span class="o">=</span> <span class="mi">0</span>
+
+    <span class="k">def</span> <span class="nf">iter</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span>
+
+    <span class="k">def</span> <span class="nf">unsubscribed</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_count</span> <span class="o">-=</span> <span class="mi">1</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_count</span> <span class="o">&lt;</span> <span class="mi">0</span>
+        
+    <span class="k">def</span> <span class="fm">__aiter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_count</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="k">return</span> <span class="bp">self</span>
+
+    <span class="k">async</span> <span class="k">def</span> <span class="fm">__anext__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_future</span><span class="p">:</span>
+            <span class="k">return</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">_future</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_future</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_loop</span><span class="o">.</span><span class="n">create_future</span><span class="p">()</span>
+        <span class="n">message</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">_channel</span><span class="o">.</span><span class="n">get</span><span class="p">()</span>
+        <span class="n">future</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_future</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_future</span><span class="p">,</span> <span class="kc">None</span>
+        <span class="n">future</span><span class="o">.</span><span class="n">set_result</span><span class="p">(</span><span class="n">message</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">message</span>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2022, ifLab.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

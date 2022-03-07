@@ -1,0 +1,35 @@
+# DUCTS Documentation
+
+DUCTS is a WebSocket-based web server framework for Python which provides useful communication protocols.
+
+**Package dependencies:**
+
+- [aiohttp](https://docs.aiohttp.org/en/stable/) -- HTTP/WebSocket server
+- [aioredis](https://aioredis.readthedocs.io/en/latest/) -- Redis client
+- [msgpack (MessagePack For Python)](https://github.com/msgpack/msgpack-python) -- Data encoding/decoding
+- [ifconf](https://github.com/iflb/ifconf) -- Server configuration management
+- And more ...
+
+**Requirements:**
+
+- Python 3.6 or above
+- Redis 5 or above
+
+## What can you do with DUCTS?
+
+- *Event-based* WebSocket communication
+- Integration with **Redis** (on-memory data store)
+- Create **Web APIs** associated to events
+- Redis-driven **file system** and programming interfaces
+
+## Contents
+
+```{toctree}
+:maxdepth: 2
+server
+```
+
+```{toctree}
+:maxdepth: 2
+client
+```

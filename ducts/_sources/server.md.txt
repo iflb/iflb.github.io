@@ -1,0 +1,191 @@
+# Server
+
+## Installation
+
+1. Install package via pip:
+
+    ```
+    pip install ducts
+    ```
+
+2. In working directory, make `htdocs` and `handler` directories:
+
+    ```
+    mkdir htdocs
+    mkdir handler    # Optional
+    ```
+
+3. Generate [ifconf](https://github.com/iflb/ifconf) config file and write it to `config_server.ini`:
+
+    ```
+    python -m ifconf ducts.server.config > config_server.ini
+    python -m ifconf ducts.redis.config >> config_server.ini
+    ```
+
+4. (Optional) Comment-in and change config values as necessary. For instance:
+
+    ```ini
+    [ducts.server_config]
+    
+    ...
+    
+    # inet port to bind (<class 'int'>)
+    httpd_port = 8888    # commented-in and changed
+    
+    # local path for static root (<class 'pathlib.Path'>)
+    # local_path_static = htdocs
+    
+    ...
+    ```
+
+5. Start Redis server.
+
+    ```
+    redis-server --port <port> &
+    ```
+
+6. Start DUCTS server.
+
+    ```
+    python -m ducts server start
+    # OR explicitly specify config file to load with -c option
+    python -m ducts server start -c config_server.ini
+    ```
+    
+    ```{note}
+    By default, DUCTS tries to find and load `config_<module name>.ini` for the config file.
+    In the above run command, argument that follows "ducts" is the module file (i.e., "server"), thereby trying `config_server.ini` when no option is specified.
+    ```
+    
+    If server is started successfully, the logs will be shown like below:
+    
+    ```text
+    > python -m ducts server start
+    2022-03-06 17:14:15,050 [root] [WARNING] Set output logging as stderr output.
+    2022-03-06 17:14:15,050 [root] [INFO] Enabled logging. Printing INFO logs.
+    2022-03-06 17:14:15,050 [root] [INFO] Completed configuration for file ['config_server.ini']
+    2022-03-06 17:14:15,067 [ducts.redis] [NOTICE] CONNECTED|URL=('localhost', 6379)
+    2022-03-06 17:14:15,077 [ducts.event.manager] [INFO] PLUGIN_DIR=/path/to/ducts/working/directory/handler
+    2022-03-06 17:14:15,085 [ducts.server.httpd] [NOTICE] START|SOCKET=('0.0.0.0', 8888)
+    >
+    ```
+    
+    As of current version, the process will run in background **AND** logs are printed as standard output by default.
+    To have output log disabled or redirected to a file, run:
+    
+    ```
+    # Disable output log
+    python -m ducts server start &> /dev/null
+    # Redirect to a file
+    python -m ducts server start &> log.txt
+    ```
+
+7. To stop DUCTS server, run:
+
+    ```
+    python -m ducts server stop
+    # OR if config file was specified when server was started
+    python -m ducts server stop -c config_server.ini
+    ```
+
+## Creating Event Handlers
+
+Event handlers are endpoints of request-response communications with clients.
+
+0. If `handler` directory does not exist in the project root, create it.
+
+    ```
+    mkdir handler
+    ```
+
+1. Create a `.py` file for an event handler in the following format,
+
+    ```
+    touch evt_<event ID>_<event_name_joined_with_underscores>.py
+    ```
+    
+    where event ID is **a number (>= 1000)**.
+
+2. Each event hander file must have the following format (at minimum):
+
+    ```python
+    from ducts.spi import EventHandler
+    
+    class Handler(EventHandler):
+        def __init__(self):
+            super().__init__()
+    
+        def setup(self, handler_spec, manager):
+            """
+                Called once this event handler file is loaded upon starting the server.
+                Must return handler_spec.
+            """
+            return handler_spec
+    
+        async def handle(self, event):
+            """
+                Called upon client's request to this event.
+                Return value (any JSON-parsable type) is a response to the client.
+            """
+            # do something ...
+            return 'Some response'
+    ```
+
+3. Restart DUCTS server and access `http(s)://<your_domain>/ducts/wsd?uuid=test` from your browser to check if the defined event is successfully loaded.
+
+    ```javascript
+    {
+        "websocket_host": "localhost:8888",
+        "websocket_url": "ws://localhost:8888/ducts/ws/v1/3bf0e158b223fe43fb8c2681f918d9e38c8a7393.MTY0NjU2MTE0NjE1NC0w",
+        ...,
+        "EVENT": {
+            "ALIVE_MONITORING": 0,
+            "LOOP_RESPONSE_START": 1,
+            ...,
+            "MY_SAMPLE_TEST": 1000    // added event handler
+        }
+    }
+    ```
+
+## Event Handler Hooks
+
+Event handler has several useful lifecycle hooks.
+
+```{eval-rst}
+.. currentmodule:: ducts.spi
+.. autoclass:: EventHandler
+    :members:
+```
+## Common Redis Usage
+
+DUCTS provides a wrapper utility class named `RedisClient` for communication with Redis server, built upon [aioredis](https://aioredis.readthedocs.io/en/latest/).
+Once server is started, `RedisClient` is automatically instanciated and can be accessed from `manager.redis` or `event.session.redis`.
+The two objects share the same instance and can be used equivalently.
+
+```{eval-rst}
+.. currentmodule:: ducts.redis
+.. autoclass:: RedisClient
+    :members:
+    :undoc-members:
+```
+
+## Routing Web APIs
+
+In addition to WebSocket communication, DUCTS also provides feature for creating Web API endpoints for normal HTTP(S) requests and responses which are linked to event handler files.
+
+For example, on server side:
+
+```
+from aiohttp import web
+from ducts.spi import EventHandler, webapi
+
+class Handler(EventHandler):
+    @webapi.add_route(path="/echo/{msg}", method='GET')
+    async def echo(self, request):
+        msg = request.match_info['msg']
+        return web.Response(text=msg)   # just echoes back client's message
+```
+
+Since this feature is an extension of [aiohttp's `add_route()` method](https://docs.aiohttp.org/en/stable/web_reference.html#aiohttp.web.UrlDispatcher.add_route), it can be used in the same way but in the decorator style.
+Every decorated function is easily served as a Web API endpoint, which is routed based on the event handler the function is declared in.
+Say the above code is written in an event handler file named `evt_1000_my_test_handler.py`, the endpoint for `echo()` will be `http(s)://<your_domain>/ducts/api/v1/my_test_handler/echo/{msg}`.
