@@ -1,6 +1,6 @@
 <center>
 
-<img src="./_media/tutti_logo.png" width="300" />
+<img src="./_media/logo_works.svg" width="400" />
 
 <span style="font-size:24px;color:grey;">Provides you with the **easiest & fastest** way to **orchestrate humans** in your system. :violin:</span>
 
