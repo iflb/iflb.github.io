@@ -7,7 +7,46 @@
 
 ?> The file is automatically created with `create_project` command.
 
-!> Changes in the project scheme will NOT be reloaded until you run `LoadFlow` DUCTS event or click <svg width="24" height="24" viewBox="0 0 24 24"><path d="M17.65,6.35C16.2,4.9 14.21,4 12,4A8,8 0 0,0 4,12A8,8 0 0,0 12,20C15.73,20 18.84,17.45 19.73,14H17.65C16.83,16.33 14.61,18 12,18A6,6 0 0,1 6,12A6,6 0 0,1 12,6C13.66,6 15.14,6.69 16.22,7.78L13,11H20V4L17.65,6.35Z" /></svg> icon in the Task Flow page in the console.
+!> Changes in the project scheme will **NOT** be reloaded until you "refresh" by clicking <svg width="24" height="24" viewBox="0 0 24 24"><path d="M17.65,6.35C16.2,4.9 14.21,4 12,4A8,8 0 0,0 4,12A8,8 0 0,0 12,20C15.73,20 18.84,17.45 19.73,14H17.65C16.83,16.33 14.61,18 12,18A6,6 0 0,1 6,12A6,6 0 0,1 12,6C13.66,6 15.14,6.69 16.22,7.78L13,11H20V4L17.65,6.35Z" /></svg> "Refresh Scheme" button in the Flow page, or call `getProjectScheme` operation via client API with `cached=false` option.
+
+## Concepts
+
+<span class="alias">scheme.py = <code>tutti/projects/&lt;project_name&gt;/scheme.py</code></span>
+<table class="concepts-table">
+    <tr>
+        <th>Operation</th>
+        <th>in Tutti.works Console</th>
+        <th>via SSH</th>
+        <th>via Client API</th>
+    </tr>
+    <tr>
+        <td>get</td>
+        <td>Check in Flow page<br>(cached data)</td>
+        <td>See source code in <span class="alias">scheme.py</span><br>(raw file)</td>
+        <td><code>getProjectScheme</code><br>w/ <code>cached=true</code> option<br>(cached data)</td>
+    </tr>
+    <tr>
+        <td>edit</td>
+        <td>Click "Open File Editor" button in Flow page</td>
+        <td>Edit source code in <span class="alias">scheme.py</span></td>
+        <td>-</td>
+    </tr>
+    <tr>
+        <td>refresh</td>
+        <td>Click "Refresh Scheme" button in Flow page</td>
+        <td><code>./tutti stop</code> and then <code>./tutti start</code><br>(*Strongly not recommended; causes side effects)</td>
+        <td><code>getProjectScheme</code><br>w/ <code>cached=false</code> option</td>
+    </tr>
+</table>
+
+#### Config
+
+**Config** is a set of parameters applied to a project, defined in `config_params()` method in `scheme.py`.
+
+#### Flow
+
+**Flow** defines template transition rules during worker's session in a microtask, written in `define_flow()` method in `scheme.py`.
+In addition to defining displayed orders of templates, each template or group of templates ("batch node") can set condition statements such as "IF" and "WHILE" so that the flow can flexibly change based on states.
 
 ## Classes
 
@@ -151,7 +190,7 @@ A superclass of `TemplateNode` and `BatchNode` which can be used to build blocks
 
 
 
-<h3 class="h-class">class libs.scheme.flow.<b>TemplateNode</b><span class="args">name, condition=None, is_skippable=False, on_enter=None, on_exit=None, on_submit=None</span></h4>
+<h3 class="h-class">class libs.scheme.flow.<b>TemplateNode</b><span class="args">name, condition=None, is_skippable=False, on_enter=None, on_exit=None, on_submit=None, next_nanotask=None, merged_props=None</span></h4>
 
 A building component of the Task Flow that represents a **template**, which is an actual nanotask visually shown to workers.
 
@@ -166,7 +205,9 @@ Derived from `FlowNode`.
 It is passed two arguments: instances of `WorkerContext` and `WorkSessionContext`.
 - **on_exit** (*function*) -- A function that is called upon leaving the executed Node.
 It is passed two arguments: instances of `WorkerContext` and `WorkSessionContext`.
-- **on_submit** (*function*) -- A hook function called internally on submission of the template node.  This function can be used mainly for saving custom information to `WorkerContext` or `WorkSessionContext`. Four arguments are passed to the function: i) a `WorkerContext` instance, ii) a `WorkSessionContext` instance, iii) a *dict* of submitted answers, and iv) a *dict* of ground-truths of the nanotask (or **None** if not exists).\
+- **on_submit** (*function*) -- A hook function called internally on submission of the template node.
+This function can be used mainly for saving custom information to `WorkerContext` or `WorkSessionContext`.
+Four arguments are passed to the function: i) a `WorkerContext` instance, ii) a `WorkSessionContext` instance, iii) a *dict* of submitted answers, and iv) a *dict* of ground-truths of the nanotask (or **None** if not exists).\
 The code below is an example of setting the `on_submit` parameter so that the work session counts the number of nanotasks a worker answered correctly on the template called "mytemplate1", and use the results to calculate the accuracy to allow only workers who had >=70% accuracy to work on the template called "mytemplate2".
 
 ```python
@@ -197,7 +238,11 @@ class ProjectScheme(ProjectSchemeBase):
 
 ```
 
-
+- **next_nanotask** (*function*) -- A function that returns the nanotask ID of a nanotask to load into the template.
+Receives `WorkerContext` and `WorkSessionContext` instances as arguments, respectively.
+If specified, nanotasks will not be assigned from the global nanotask queue, but the returned nanotask ID will always be the next nanotask. 
+In case nanotask ID does not exist, the flow will immediately terminate the work session.
+- **merged_props** (*dict*) -- A key-value set to be merged into nanotask props.
 
 ---
 
@@ -210,14 +255,16 @@ A building component of the Task Flow which can create a group of **templates** 
 
 Derived from `FlowNode`.
 
-#### Parameters (see `TemplateNode` for detailed descriptions):
+#### Parameters:
 
-- **name** (*str*) -- A name of the batch. This can be any string but needs to be unique.
+- **name** (*str*) -- A name of the template. This value needs to be the same as that registered via `CreateTemplate` Event.
 - **children** (*list*) -- A sequence of child nodes (*i.e.,* `TemplateNode`s and/or `BatchNode`s) to create a group with. All the child nodes must be in the order.
 - **condition** (*Condition*) -- A condition for the statement.
-- **is_skippable** (*bool*) -- Whether to allow workers to skip the node to the next when the template node cannot be assigned.
-- **on_enter** (*function*) -- A function that is called *before* the Node is visited.
+- **is_skippable** (*bool*) -- Whether to allow workers to skip the node to the next when the template node cannot be assigned. *If False is set, the project terminates the work session and starts the new one.*
+- **on_enter** (*function*) -- A function that is called *before* the Node is visited (regardless of whether it will be executed or not).
+It is passed two arguments: instances of `WorkerContext` and `WorkSessionContext`.
 - **on_exit** (*function*) -- A function that is called upon leaving the executed Node.
+It is passed two arguments: instances of `WorkerContext` and `WorkSessionContext`.
 
 
 ---
@@ -366,6 +413,10 @@ An *integer* value.
 
 A `ContextBase` subclass with a scope for a worker ID.
 
+#### Parameters:
+
+- **project_id** (*int*) -- An index number for the worker within the project.
+This value may be different across projects even for the same worker. One of the intended use case is for round-robin nanotask assignment.
 
 ---
 
