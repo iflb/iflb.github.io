@@ -1,5 +1,7 @@
 # Installation
 
+!> <span style="color:#c00;">As of March 2022, Tutti.works source code has been moved into our Github private repository, therefore manual Tutti.works installation is restricted for those without permissions.</span>
+
 ## 1. Get Docker ready
 
 To build Tutti environment, you first need to install **Docker** and **Docker Compose** in your host server.  
@@ -20,8 +22,8 @@ git clone https://github.com/iflb/tutti
 
 There are two hosts used in Tutti: for **production** and **development**.
 
-- **Production host** ... Can be distributed to external workers. <span style="color:red">Manual build is necessary</span> before publishing.
-- **Development host** ... Used for prototyping Tutti projects. Changes in projects are monitored and automatically rebuilt.
+- **Production URL** ... Can be distributed to external workers. <span style="color:red">Manual build is necessary</span> before publishing.
+- **Development URL** ... Used for prototyping Tutti projects. Changes in projects are monitored and automatically rebuilt.
 
 #### 3-1-1. Production host
 
