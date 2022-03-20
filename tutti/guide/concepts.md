@@ -6,6 +6,21 @@ Note that information described in this page is not inclusive, and some of the c
 
 ## Tutti Resources
 
+```mermaid
+erDiagram
+    Tutti-works-Environment ||--|{ Project : has
+    Project ||--|{ Template : has
+    Project ||--|| Scheme : has
+    Scheme ||--|| Flow : defines
+    Flow ||--|{ Template : consists-of
+    Template ||--o{ Nanotask : has
+    Project }|--|{ Work-Session : generates-when-visited-by-workers
+    Work-Session ||--|{ Node-Session : groups
+    Template }|--o{ Response : collects
+    Nanotask }o--o{ Response : is-associated-with
+    Node-Session ||--|| Response : is-associated-with
+```
+
 ### Project
 
 **Project** is a working space that contains all configurations for a microtask, including a set of web page UIs, conditional rules, parameters, etc.

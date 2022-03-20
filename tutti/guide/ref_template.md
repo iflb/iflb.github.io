@@ -2,20 +2,19 @@
 
 ## File names and locations
 
-- Preview
-    - `tutti/projects/<project_name>/templates/Preview.vue`
-- Instruction
-    - `tutti/projects/<project_name>/templates/Instruction.vue`
-- Main Template
-    - `tutti/projects/<project_name>/templates/<template_name>/Main.vue`
+| Template Type | Path |
+| ------------- | ---- |
+| Preview | `tutti/projects/<project_name>/templates/Preview.vue` |
+| Instruction | `tutti/projects/<project_name>/templates/Instruction.vue` |
+| Main Template | <code>tutti/projects/\<project_name\>/templates/\<template_name\>/Main.\[vue\|html\]</code> |
 
 ?> Preview and instruction files are created with `create_project` command, and the main template file is created with `create_template` command.
 
 ## Preview & instruction
 
-The preview and instruction files, with a `.vue` extension, are basically [Vue.js' single file components](https://vuejs.org/v2/guide/single-file-components.html); you can thus not only write HTML collocate CSS and JavaScript in the files.
+The preview and instruction files, with a `.vue` extension, are basically [Vue.js' single file components (SFCs)](https://vuejs.org/v2/guide/single-file-components.html); you can thus not only write HTML collocate CSS and JavaScript in the files.
 
-For those who are not familiar to Vue.js' single file components, here's an example for the minimum code:
+For those who are not familiar to Vue.js' SFC, here's an example for the minimum code:
 
 ```markup
 <!-- Works in both Preview.vue and Instruction.vue -->
@@ -46,7 +45,10 @@ There are two patterns where the instruction page components is shown to workers
 <img src="./_media/instruction.gif" width="500" />
 
 
-## Main Template
+## Main Template (Vue.js -- Main.vue)
+
+When a template file is named `Main.vue`, the template code needs to be written in a Vue's SFC manner.
+Programming references are described below:
 
 ### Vue Mixin
 
@@ -76,7 +78,8 @@ This `nanoMixIn` module contains a set of Tutti-defined [Vue's options](https://
 - `nano.props`
   - A readable object which contains "**nano props**", a set of dynamic contents in the template for a loaded nanotask, which is uploaded with `UploadNanotasks` Event.
 - `defaultProps`
-  - A readable/writable object for placeholder values when no valid value for a child of `nano.props` was found, such as when no assignable nanotask could be loaded or an unknown child key value was specified.
+  - Sets default values for `nano.props` when no valid value for nanotask props was found, such as when no assignable nanotask is found for the worker or an unknown child key value was specified.
+    This is also used in previewing templates in Tutti.works Console.
     To initialize the object, just create data in the template file like:
     ```javascript
     <script>
@@ -101,8 +104,9 @@ This `nanoMixIn` module contains a set of Tutti-defined [Vue's options](https://
 
 #### method
 
-- `submit()`
+- `submit(answers)`
   - A method to finish the current template and step forward to the next template node.
+  - When `answers` is not passed (*i.e.,* `undefined`), answers bound to `nano.ans` and data associated with `v-model`+`v-nano` directives is sent to server.
 
 #### directives
 
@@ -111,3 +115,60 @@ This `nanoMixIn` module contains a set of Tutti-defined [Vue's options](https://
     If data is bound the `v-nano` directive, the string specified for `v-model` is registered as a key of `nano.ans` object.
   - `.required` modifier is allowed for use to make the input to be a required field (this effects the return value of `canSubmit`).
 
+
+## Main Template (Pure HTML -- Main.html)
+
+For those who are not familiar with coding in Vue.js and want to stick with pure HTML, Tutti.works also provides that option.
+To use this feature, you need to:
+
+1. Create `Main.html` in the template directory, and
+2. Delete `Main.vue` (**important**; otherwise `Main.html` will not be loaded)
+
+To make `Main.html` properly work as a Tutti.works template, use APIs described below:
+
+### Imported module
+
+A module object named `nano` is imported.
+No additional module import is needed on users' end.
+
+##### `nano.submit(answers)`
+
+Finishes the current template, sends the answers to the server, and step forward to the next template node.
+`answers` argument must be passed in `object` type.
+
+##### `nano.setDefaultProps(props)`
+
+Sets default values for `nano.props` when no valid value for nanotask props was found, such as when no assignable nanotask is found for the worker or an unknown child key value was specified.
+This is also used in previewing templates in Tutti.works Console.
+`props` argument must be passed in `object` type.
+
+##### `nano.applyProps(handler)`
+
+Make nanotask props loaded to the template available from JavaScript and executes the handler method passed as `handler` argument.
+`handler` receives `props` argument, which contains an object of all props loaded for the nanotask.
+
+### Basic Usage
+
+An example of a whole `Main.html` file looks like as follows:
+
+```html
+<html>
+<body>
+  <!-- Define your template UI here -->
+  <button onClick="nano.submit(answerObject)">
+</body>
+<script>
+let answerObject = {};
+window.addEventListener('nanoLoad', () => {
+    nano.setDefaultProps({
+      // define default values for your nanotask props
+    })
+    nano.applyProps((props) => {
+      // write logics to apply loaded nanotask props to your template
+    })
+});
+</script>
+</html>
+```
+
+Note that any codes that use `nano` object must be accessed after a custom event called `nanoLoad` is emitted, otherwise `nano` will return `undefined`.
