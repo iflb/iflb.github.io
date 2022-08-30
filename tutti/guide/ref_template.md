@@ -65,7 +65,7 @@ This `nanoMixIn` module contains a set of Tutti-defined [Vue's options](https://
 
 #### data
 
-- `nano.ans`
+- `nano.ans` (Object)
   - A writable object which stores worker's answers sent to Tutti's backend server when `submit()` is called.
     Its format should be like:
     ```json
@@ -75,12 +75,16 @@ This `nanoMixIn` module contains a set of Tutti-defined [Vue's options](https://
         ...
     }
     ```
-- `nano.props`
+- `nano.props` (Object)
   - A readable object which contains "**nano props**", a set of dynamic contents in the template for a loaded nanotask, which is uploaded with `UploadNanotasks` Event.
-- `defaultProps`
-  - Sets default values for `nano.props` when no valid value for nanotask props was found, such as when no assignable nanotask is found for the worker or an unknown child key value was specified.
-    This is also used in previewing templates in Tutti.works Console.
-    To initialize the object, just create data in the template file like:
+
+- ~~`defaultProps`~~ (Object) <span style="color:red">deleted since 0.3.24</span>
+- `defaultNanoProps` (Object) <span style="color:green">valid from 0.3.24</span>
+  - A set of values initially set to `nano.props` (= nanotask INPUT).
+  It is recommended to set this `Object`-typed value, to explicitly indicate expected members to be input to nanotasks.
+  Default member values are usually used when 1) the template is previewed in the Templates page, and 2) the template is rendered in a task but no nanotask is registered to it.
+
+  To initialize it, just create `data` in the template file like:
     ```javascript
     <script>
     import nanoMixIn from "@/mixins/nano";
@@ -88,29 +92,96 @@ This `nanoMixIn` module contains a set of Tutti-defined [Vue's options](https://
         mixins: [nanoMixIn],
         data: () => ({
             defaultNanoProps: {
-                "mystring": "my default value",
-                "myurl": "https://some.default.url"
+                mystring: "my default value",
+                myurl: "https://some.default.url"
             }
         })
     };
     </script>
     ```
-    and the values will automatically replace `nano.props.mystring` and `nano.props.myurl` automatically when nano props are not available.
+  so the default values are set to `nano.props.mystring` and `nano.props.myurl`.
+
+- `defaultNanoAnswers` (Object) <span style="color:green">valid from 0.3.24</span>
+  - A set of values initially set to `nano.ans` (= nanotask OUTPUT).
+  It is **necessary** to set this `Object`-typed value, to initialize keys and values used for user inputs in the nanotask.
+  
+  To initialize it, just create `data` in the template file like:
+    ```javascript
+    <script>
+    import nanoMixIn from "@/mixins/nano";
+    export default {
+        mixins: [nanoMixIn],
+        data: () => ({
+            defaultNanoAnswers: {
+                myCheckboxAnswer: [],
+                myTextInputAnswer: ""
+            }
+        })
+    };
+    </script>
+    ```
+
+- `workerId` (String)
+  - An internal worker ID string.
 
 #### computed property
 
-- `canSubmit`
+- ~~`canSubmit`~~ <span style="color:red">Deprecated since 0.3.34</span>
   - A helper property that returns a boolean value whether all required answer fields are filled (*c.f.,* `v-nano`).
+
+- `fileUploadStatus` <span style="color:green">valid from 0.3.24</span>
+  - An `Array` that contains either `'waiting' | 'uploading' | 'complete'` in each element, of which index corresponds to that of files uploaded to the queue.
+
+- `allFileUploadComplete` <span style="color:green">valid from 0.3.24</span>
+  - A `Boolean` value that returns `true` when all queued files are uploaded, otherwise `false`.
+  This is equivalent to `this.fileUploadStatus.every(s => s === 'complete')`.
 
 #### method
 
+<<<<<<< HEAD
 - `submit(answers)`
   - A method to finish the current template and step forward to the next template node.
   - When `answers` is not passed (*i.e.,* `undefined`), answers bound to `nano.ans` and data associated with `v-model`+`v-nano` directives is sent to server.
+=======
+- `submit()`
+  - A method to finish the current template and step forward to the next template node. Required in a template.
+
+- `uploadQueuedFile(index)` <span style="color:green">valid from 0.3.24</span>
+  - Starts uploading a file queued at the given index.
+  - **Arguments**
+    - `index` (Number)
+- `async addBufferToFileUploadQueue(buffer, path, name, uploadInstantly=false)` <span style="color:green">valid from 0.3.24</span>
+  - Add data to be written to the file storage into the queue.
+  - **Must be called with `await`**. 
+  - **Arguments**
+    - `buffer` (TypedArray) - Data to write as a file.
+    - `path` (String) - A directory path to write a file to.
+    - `name` (String) - A written file name.
+    - `uploadInstantly` (Boolean) - Whether to call `uploadQueuedFile()` immediately after the data is queued.
+  - **Returns**
+    - `index` (Number) - An index of the queued entry.
+
+- `removeFromFileUploadQueue(index)` <span style="color:green">valid from 0.3.24</span>
+  - Removes the data from the queue.
+  - **Arguments**
+    - `index` (Number)
+
+- `addFileUploadStatusChangeHandler(handler)` <span style="color:green">valid from 0.3.24</span>
+  - Adds a handler function which is called when a upload status change.
+  - **Arguments**
+    - `handler` (function)
+  - **Returns**
+    - `handlerId` (Number)
+
+- `removeFileUploadStatusChangeHandler(handlerId)` <span style="color:green">valid from 0.3.24</span>
+  - Removes a handler function called on upload status change.
+  - **Arguments**
+    - `handlerId` (Number)
+>>>>>>> develop
 
 #### directives
 
-- `v-nano`
+- ~~`v-nano`~~ <span style="color:red">Deprecated since 0.3.34</span>
   - Adding `v-nano` directive to input components makes its `v-model`-binded data also synchronized to workers' answer data which is to be sent to Tutti's server.
     If data is bound the `v-nano` directive, the string specified for `v-model` is registered as a key of `nano.ans` object.
   - `.required` modifier is allowed for use to make the input to be a required field (this effects the return value of `canSubmit`).
